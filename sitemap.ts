@@ -127,21 +127,11 @@ cli
       fs.mkdirSync(path.dirname(options.output), { recursive: true })
 
     function getPriority(depth: number) {
-      switch (depth) {
-        case 1: return 1
-        case 2: return 0.8
-        case 3: return 0.6
-        default: return round(1 / depth, 2)
-      }
+      return round(0.8 ** (depth - 1), 2)
     }
 
     fs.writeFileSync(options.output, `<?xml version="1.0" encoding="UTF-8"?>
-<urlset
-  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
-  http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
->${Object.values(pages).filter(page => !page.error).map(page => `
+<urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${Object.values(pages).filter(page => !page.error).map(page => `
   <url>
     <loc>${page.path}</loc>
     <lastmod>${new Date().toISOString()}</lastmod>
