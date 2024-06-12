@@ -14,6 +14,10 @@ function notNull<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined
 }
 
+export function round(nb: number, precision = 2) {
+  return Math.round(nb * (10 ** precision)) / (10 ** precision)
+}
+
 async function checkAvailable(baseUrl: URL | string) {
   const url = new URL(baseUrl)
   const data = await fetch(url)
@@ -122,6 +126,15 @@ cli
     if (!fs.existsSync(path.dirname(options.output)))
       fs.mkdirSync(path.dirname(options.output), { recursive: true })
 
+    function getPriority(depth: number) {
+      switch (depth) {
+        case 1: return 1
+        case 2: return 0.8
+        case 3: return 0.6
+        default: return round(1 / depth, 2)
+      }
+    }
+
     fs.writeFileSync(options.output, `<?xml version="1.0" encoding="UTF-8"?>
 <urlset
   xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
@@ -132,7 +145,8 @@ cli
   <url>
     <loc>${page.path}</loc>
     <lastmod>${new Date().toISOString()}</lastmod>
-    <priority>${1 / page.depth}</priority>
+    <priority>${getPriority(page.depth)}</priority>
+    <changefreq>daily</changefreq>
   </url>`).join('')}
 </urlset>
 `)
