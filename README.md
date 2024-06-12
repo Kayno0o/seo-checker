@@ -1,15 +1,21 @@
 # seo-checker
 
+A small script to check some SEO/accessibility errors/warning on a website.
+
 To install dependencies:
 
 ```bash
 bun install
 ```
 
-To run:
+# Check SEO errors/warning
 
 ```bash
-bun run index.ts
+bun seo.ts check <url>
 ```
 
-This project was created using `bun init` in bun v1.1.10. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+# Generate sitemap.xml
+
+```bash
+bun sitemap.ts generate <url>
+```

@@ -82,8 +82,8 @@ async function checkAllPages(baseUrl: string, options: { max: number }) {
 const cli = new Command()
 
 cli
-  .command('check')
-  .argument('<url>', 'Check a website')
+  .command('generate')
+  .argument('<url>', 'URL of the website')
   .option<number>('-m, --max <number>', 'Max concurrent requests', (max: string) => Number.parseInt(max), 15)
   .option('-o, --output <string>', 'Path of output sitemap.xml file', 'sitemap.xml')
   .action(async (url: string, options: { max: number, output: string }) => {
