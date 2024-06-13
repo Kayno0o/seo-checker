@@ -43,7 +43,7 @@ async function checkPath(baseUrl: string, page: PageType, pages: Record<string, 
 
   const pagesToCheck: PageType[] = []
 
-  const links = text.matchAll(/href="([^"]+)"/g)
+  const links = text.matchAll(/<a[^>]+href="([^"]+)"/g)
   for (const link of links) {
     const linkUrl = new URL(link[1], baseUrl)
     if (linkUrl.origin === baseUrl && !Object.values(pages).find(page => page.path === linkUrl.toString()) && !pagesToCheck.find(page => page.path === linkUrl.pathname))
