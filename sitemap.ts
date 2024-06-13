@@ -1,17 +1,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { Command } from 'commander'
-import { JSDOM } from 'jsdom'
 import chalk from 'chalk'
 
 interface PageType {
   path: string
   depth: number
   error?: boolean
-}
-
-function notNull<T>(value: T | null | undefined): value is T {
-  return value !== null && value !== undefined
 }
 
 export function round(nb: number, precision = 2) {
@@ -41,9 +36,6 @@ async function checkPath(baseUrl: string, page: PageType, pages: Record<string, 
 
   console.log(chalk.bold.blue('[fetch]'), url.toString(), chalk.bold.blue('in'), Math.round(loadingTime), 'ms')
 
-  const dom = new JSDOM(text)
-  const document = dom.window.document
-
   pages[page.path] = {
     path: url.toString(),
     depth: page.depth,
@@ -51,9 +43,9 @@ async function checkPath(baseUrl: string, page: PageType, pages: Record<string, 
 
   const pagesToCheck: PageType[] = []
 
-  const links = Array.from(document.querySelectorAll('a')).map(element => element.getAttribute('href')).filter(notNull)
+  const links = text.matchAll(/href="([^"]+)"/g)
   for (const link of links) {
-    const linkUrl = new URL(link, baseUrl)
+    const linkUrl = new URL(link[1], baseUrl)
     if (linkUrl.origin === baseUrl && !Object.values(pages).find(page => page.path === linkUrl.toString()) && !pagesToCheck.find(page => page.path === linkUrl.pathname))
       pagesToCheck.push({ path: linkUrl.pathname, depth: page.depth + 1 })
   }
