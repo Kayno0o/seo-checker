@@ -18,14 +18,6 @@ export function round(nb: number, precision = 2) {
   return Math.round(nb * (10 ** precision)) / (10 ** precision)
 }
 
-async function checkAvailable(baseUrl: URL | string) {
-  const url = new URL(baseUrl)
-  const data = await fetch(url)
-  if (!data.ok)
-    return false
-  return true
-}
-
 async function checkPath(baseUrl: string, page: PageType, pages: Record<string, PageType> = {}): Promise<PageType[]> {
   if (pages[page.path] || page.path.startsWith('http'))
     return []
@@ -101,23 +93,8 @@ cli
 
     console.log()
 
-    if (!(await checkAvailable(baseUrl))) {
-      console.log(chalk.bold.red('The website is not available'))
-      return
-    }
-
     const startTime = performance.now()
     const pages = await checkAllPages(baseUrl, options)
-
-    if (!await checkAvailable(new URL('robots.txt', baseUrl))) {
-      console.log()
-      console.log(chalk.bold.red('robots.txt not found'))
-    }
-
-    if (!await checkAvailable(new URL('sitemap.xml', baseUrl))) {
-      console.log()
-      console.log(chalk.bold.red('sitemap.xml not found'))
-    }
 
     console.log()
     console.log(chalk.bold.blue('[fetch]'), Object.keys(pages).length, 'pages', chalk.bold.blue('in'), Math.round(performance.now() - startTime), 'ms')
