@@ -63,7 +63,7 @@ function filterElement(element: Element, options?: { visible?: boolean, noConten
 }
 
 async function checkPath(baseUrl: string, path: string, pages: Record<string, PageType>, options?: { seo?: boolean, accessibility?: boolean, verbose?: boolean, socialMedia?: boolean }): Promise<string[]> {
-  if (pages[path] || path.startsWith('http'))
+  if (pages[path] || path.startsWith('http') || path.endsWith('sitemap.xml') || path.endsWith('robots.txt'))
     return []
 
   console.log(chalk.cyan('[checking]'), path)
@@ -113,15 +113,6 @@ async function checkPath(baseUrl: string, path: string, pages: Record<string, Pa
       errors.push('SEO: Missing h1')
     else if (Object.values(headings).every(heading => heading.length === 0))
       errors.push('SEO: No headings')
-
-    if (document.querySelector('meta[name="keywords"]')) {
-      const keywords = document.querySelector('meta[name="keywords"]')?.getAttribute('content')?.split(',') ?? []
-      if (keywords.length > 10)
-        warnings.push('SEO: Too many keywords')
-    }
-    else {
-      warnings.push('SEO: Missing meta keywords tag')
-    }
 
     if (headings.h1.length > 1)
       errors.push('SEO: Multiple h1')
