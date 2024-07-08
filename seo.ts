@@ -26,6 +26,30 @@ async function testUrl(path: string) {
   }
 }
 
+// also check parent elements for aria-hidden
+function notAriaHidden(element: Element) {
+  if (element.getAttribute('aria-hidden') === 'true' || element.getAttribute('aria-hidden') === '')
+    return false
+
+  if (element.parentElement)
+    return notAriaHidden(element.parentElement)
+
+  return true
+}
+
+// check element to have textContent or content for aria-label, if none, check children
+function hasAccessibilityContent(element: Element, value = true): boolean {
+  if (element.getAttribute('aria-label') || element.textContent?.trim())
+    return value
+
+  for (const child of element.children) {
+    if (hasAccessibilityContent(child, value))
+      return value
+  }
+
+  return false
+}
+
 function getTag(element: Element) {
   return element.outerHTML.slice(0, element.outerHTML.indexOf('>') + 1)
 }
@@ -36,30 +60,6 @@ function notNull<T>(value: T | null | undefined): value is T {
 
 function isHTMLElement(element: Element): element is HTMLElement {
   return 'style' in element
-}
-
-function isVisible(element: Element) {
-  if (!isHTMLElement(element))
-    return false
-
-  if (element.style.display === 'none' || element.style.visibility === 'hidden' || element.style.opacity === '0')
-    return false
-
-  return true
-}
-
-function filterElement(element: Element, options?: { visible?: boolean, noContent?: boolean }): element is HTMLElement {
-  if (!isHTMLElement(element))
-    return false
-
-  let value = true
-  if (value && options?.visible !== undefined && isVisible(element) !== options.visible)
-    value = false
-
-  if (value && options?.noContent !== undefined && (!element.textContent?.trim()) !== options.noContent)
-    value = false
-
-  return value
 }
 
 async function checkPath(baseUrl: string, path: string, pages: Record<string, PageType>, options?: { seo?: boolean, accessibility?: boolean, verbose?: boolean, socialMedia?: boolean }): Promise<string[]> {
@@ -183,13 +183,21 @@ async function checkPath(baseUrl: string, path: string, pages: Record<string, Pa
   }
 
   if (accessibility) {
-    const notLabelledLink = Array.from(document.querySelectorAll('a:not([aria-label]), [role=button]:not([aria-label]), button:not([aria-label])')).filter((element): element is HTMLElement => filterElement(element, { noContent: true }))
+    const notLabelledLink = Array.from(document.querySelectorAll('a:not([aria-label]), [role=button]:not([aria-label]), button:not([aria-label])')).filter(isHTMLElement).filter(notAriaHidden).filter(e => hasAccessibilityContent(e, false))
     for (const element of notLabelledLink)
       errors.push(`Accessibility: Not labelled link/button: ${getTag(element)}`)
 
-    const notAltImage = Array.from(document.querySelectorAll('img:not([alt])')).filter((element): element is HTMLElement => filterElement(element))
+    const notAltImage = Array.from(document.querySelectorAll('img:not([alt])')).filter(notAriaHidden)
     for (const element of notAltImage)
       errors.push(`Accessibility: Image without alt: ${getTag(element)}`)
+
+    const notRoleImgSvg = Array.from(document.querySelectorAll('svg:not([role=img])')).filter(notAriaHidden)
+    for (const element of notRoleImgSvg)
+      warnings.push(`Accessibility: SVG without role=img: ${getTag(element)}`)
+
+    const notAriaLabelSvg = Array.from(document.querySelectorAll('svg:not([aria-label])')).filter(notAriaHidden)
+    for (const element of notAriaLabelSvg)
+      errors.push(`Accessibility: SVG without aria-label: ${getTag(element)}`)
   }
 
   pages[path] = {
