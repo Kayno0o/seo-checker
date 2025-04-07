@@ -79,6 +79,12 @@ async function checkPath(baseUrl: string, path: string, pages: Record<string, Pa
   const startTime = performance.now()
   const data = await fetch(url)
   const text = await data.text()
+
+  // ignore responses that are not html
+  if (!data.headers.get('content-type')?.includes('text/html')) {
+    return []
+  }
+
   const loadingTime = performance.now() - startTime
 
   if (!data.ok) {
@@ -147,7 +153,9 @@ async function checkPath(baseUrl: string, path: string, pages: Record<string, Pa
       try {
         const imgUrl = image.startsWith('http') ? new URL(image) : new URL(image, baseUrl)
         const data = await fetch(imgUrl)
-        if (!data.headers.get('content-type')?.startsWith('image'))
+        if (!data.ok)
+          errors.push(`SEO: Image not reachable: ${imgUrl.toString()}`)
+        else if (!data.headers.get('content-type')?.startsWith('image'))
           errors.push(`SEO: Not an image: ${imgUrl.toString()}`)
       }
       catch (e) {
