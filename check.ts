@@ -1,15 +1,27 @@
 import fs from 'node:fs'
-import { colors } from '@kaynooo/utils'
+import { readdir } from 'node:fs/promises'
+import { colors, notNullish } from '@kaynooo/utils'
 import { Command } from 'commander'
 import { JSDOM } from 'jsdom'
 
-interface PageType {
+export interface PageType {
   path: string
   title: string
   headings: Record<'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6', string[]>
   errors: string[]
   warnings: string[]
   loadingTime?: number
+}
+
+const methods: Record<string, (options: CheckOptions, document: Document, page: PageType) => Promise<void>> = {}
+const files = await readdir(new URL('./check', import.meta.url))
+for (const file of files) {
+  if (file.endsWith('.ts') && file !== 'index.ts') {
+    const module = await import(`./check/${file}`)
+    if (module.default) {
+      methods[file.slice(0, -3)] = module.default
+    }
+  }
 }
 
 async function testUrl(path: string) {
@@ -30,49 +42,13 @@ async function testUrl(path: string) {
   }
 }
 
-// also check parent elements for aria-hidden
-function notAriaHidden(element: Element) {
-  if (element.getAttribute('aria-hidden') === 'true' || element.getAttribute('aria-hidden') === '')
-    return false
+export interface CheckOptions { seo?: boolean, accessibility?: boolean, verbose?: boolean, socialMedia?: boolean }
 
-  if (element.parentElement)
-    return notAriaHidden(element.parentElement)
-
-  return true
-}
-
-// check element to have textContent or content for aria-label, if none, check children
-function hasAccessibilityContent(element: Element, value = true): boolean {
-  if (element.getAttribute('aria-label') || element.textContent?.trim())
-    return value
-
-  for (const child of element.children) {
-    if (hasAccessibilityContent(child, value))
-      return value
-  }
-
-  return false
-}
-
-function getTag(element: Element) {
-  return element.outerHTML.slice(0, element.outerHTML.indexOf('>') + 1)
-}
-
-function notNull<T>(value: T | null | undefined): value is T {
-  return value !== null && value !== undefined
-}
-
-function isHTMLElement(element: Element): element is HTMLElement {
-  return 'style' in element
-}
-
-async function checkPath(baseUrl: string, path: string, pages: Record<string, PageType>, options?: { seo?: boolean, accessibility?: boolean, verbose?: boolean, socialMedia?: boolean }): Promise<string[]> {
+async function checkPath(baseUrl: string, path: string, pages: Record<string, PageType>, options: CheckOptions = { seo: true, accessibility: true, socialMedia: true }): Promise<string[]> {
   if (pages[path] || path.startsWith('http') || path.endsWith('sitemap.xml') || path.endsWith('robots.txt'))
     return []
 
   console.log(colors.cyan('[checking]'), path)
-
-  const { seo = true, accessibility = true, socialMedia = true } = options ?? {}
 
   const errors: string[] = []
   const warnings: string[] = []
@@ -112,119 +88,22 @@ async function checkPath(baseUrl: string, path: string, pages: Record<string, Pa
   const dom = new JSDOM(textWithoutStyles)
   const document = dom.window.document
 
-  const headings: Record<string, string[]> = {}
-  for (let i = 1; i <= 6; i++) {
-    const selector = `h${i}`
-    const elements = document.querySelectorAll(selector)
-    headings[selector] = Array.from(elements).map(element => element.textContent?.trim()).filter(notNull)
-  }
-
-  if (seo) {
-    if (document.querySelector('h1') === null)
-      errors.push('SEO: Missing h1')
-    else if (Object.values(headings).every(heading => heading.length === 0))
-      errors.push('SEO: No headings')
-
-    if (headings.h1.length > 1)
-      errors.push('SEO: Multiple h1')
-
-    for (let i = 2; i <= 6; i++) {
-      const selector = `h${i}`
-      if (headings[selector].length > 0 && headings[`h${i - 1}`].length === 0)
-        errors.push(`SEO: Heading ${i} without heading ${i - 1}`)
-    }
-
-    if (!document.title.trim())
-      errors.push('SEO: Missing title')
-    else if (overflowTitle(document.title))
-      warnings.push('SEO: Title too long')
-
-    if (!document.querySelector('meta[name="description"]'))
-      errors.push(`SEO: Missing meta description tag`)
-
-    if (headings.h1) {
-      for (const heading of headings.h1) {
-        if (heading.split(' ').length > 12)
-          warnings.push(`SEO: H1 too long: ${heading}`)
-      }
-    }
-
-    const notHrefLink = Array.from(document.querySelectorAll('a:not([href])'))
-    for (const element of notHrefLink)
-      errors.push(`SEO: Link without href: ${getTag(element)}`)
-
-    const images = Array.from(document.querySelectorAll('img[src]')).map(element => element.getAttribute('src')) as string[]
-    for (const image of images) {
-      try {
-        const imgUrl = image.startsWith('http') ? new URL(image) : new URL(image, baseUrl)
-        const data = await fetch(imgUrl)
-        if (!data.ok)
-          errors.push(`SEO: Image not reachable: ${imgUrl.toString()}`)
-        else if (!data.headers.get('content-type')?.startsWith('image'))
-          errors.push(`SEO: Not an image: ${imgUrl.toString()}`)
-      }
-      catch (e) {
-        errors.push(`SEO: Image not reachable: ${image} - ${(e instanceof Error ? e.message : String(e))}`)
-        console.error(`Error fetching image ${image}:`, e)
-      }
-    }
-  }
-
-  if (socialMedia) {
-    if (!document.querySelector('meta[property="og:title"]'))
-      errors.push(`SEO: Missing og:title tag`)
-
-    if (!document.querySelector('meta[property="og:description"]'))
-      errors.push(`SEO: Missing og:description tag`)
-
-    if (!document.querySelector('meta[property="og:image"]'))
-      errors.push(`SEO: Missing og:image tag`)
-
-    if (!document.querySelector('meta[property="og:url"]'))
-      errors.push(`SEO: Missing og:url tag`)
-
-    if (!document.querySelector('meta[property="og:type"]'))
-      errors.push(`SEO: Missing og:type tag`)
-
-    if (!document.querySelector('meta[name="twitter:title"]'))
-      errors.push(`SEO: Missing twitter:title tag`)
-
-    if (!document.querySelector('meta[name="twitter:description"]'))
-      errors.push(`SEO: Missing twitter:description tag`)
-
-    if (!document.querySelector('meta[name="twitter:image"]'))
-      errors.push(`SEO: Missing twitter:image tag`)
-  }
-
-  if (accessibility) {
-    const notLabelledLink = Array.from(document.querySelectorAll('a:not([aria-label]), [role=button]:not([aria-label]), button:not([aria-label])')).filter(isHTMLElement).filter(notAriaHidden).filter(e => hasAccessibilityContent(e, false))
-    for (const element of notLabelledLink)
-      errors.push(`Accessibility: Not labelled link/button: ${getTag(element)}`)
-
-    const notAltImage = Array.from(document.querySelectorAll('img:not([alt])')).filter(notAriaHidden)
-    for (const element of notAltImage)
-      errors.push(`Accessibility: Image without alt: ${getTag(element)}`)
-
-    const notRoleImgSvg = Array.from(document.querySelectorAll('svg:not([role=img])')).filter(notAriaHidden)
-    for (const element of notRoleImgSvg)
-      warnings.push(`Accessibility: SVG without role=img: ${getTag(element)}`)
-
-    const notAriaLabelSvg = Array.from(document.querySelectorAll('svg:not([aria-label])')).filter(notAriaHidden)
-    for (const element of notAriaLabelSvg)
-      errors.push(`Accessibility: SVG without aria-label: ${getTag(element)}`)
-  }
-
-  pages[path] = {
+  const page: PageType = {
     path: url.toString(),
     title: document.title.trim(),
-    headings,
+    headings: { h1: [], h2: [], h3: [], h4: [], h5: [], h6: [] },
     errors,
     warnings,
     loadingTime,
   }
 
+  for (const method of Object.values(methods))
+    await method(options, document, page)
+
+  pages[path] = page
+
   const pagesToCheck: string[] = []
-  const links = Array.from(document.querySelectorAll('a')).map(element => element.getAttribute('href')).filter(notNull)
+  const links = Array.from(document.querySelectorAll('a')).map(element => element.getAttribute('href')).filter(notNullish)
   for (const link of links) {
     const url = new URL(link, baseUrl)
     if (url.origin === baseUrl && !pagesToCheck.includes(url.pathname) && !Object.values(pages).find(page => page.path === url.toString()))
@@ -255,16 +134,9 @@ async function checkAllPages(baseUrl: string, options: { max: number, seo: boole
   return pages
 }
 
-const sizes: Record<string, number> = { '0': 11.484375, '1': 11.484375, '2': 11.484375, '3': 11.484375, '4': 11.484375, '5': 11.484375, '6': 11.484375, '7': 11.484375, '8': 11.484375, '9': 11.484375, 'A': 13.46875, 'B': 12.765625, 'C': 13.09375, 'D': 13, 'E': 11.25, 'F': 10.96875, 'G': 13.625, 'H': 14.140625, 'I': 5.84375, 'J': 11.171875, 'K': 12.703125, 'L': 10.84375, 'M': 17.53125, 'N': 14.125, 'O': 13.8125, 'P': 12.90625, 'Q': 13.8125, 'R': 12.765625, 'S': 12.296875, 'T': 12.375, 'U': 13.171875, 'V': 13.078125, 'W': 17.5, 'X': 12.71875, 'Y': 12.375, 'Z': 12.125, 'a': 10.734375, 'b': 11.265625, 'c': 10.4375, 'd': 11.28125, 'e': 10.8125, 'f': 6.9375, 'g': 11.421875, 'h': 11.203125, 'i': 5.3125, 'j': 5.203125, 'k': 10.6875, 'l': 5.3125, 'm': 17.328125, 'n': 11.203125, 'o': 11.3125, 'p': 11.265625, 'q': 11.3125, 'r': 7.296875, 's': 10.296875, 't': 6.765625, 'u': 11.203125, 'v': 10.109375, 'w': 14.703125, 'x': 10.1875, 'y': 10.046875, 'z': 10.1875, '-': 7.765625, ' ': 4.984375 }
-const averageSize = Object.values(sizes).reduce((total, size) => total + size, 0) / Object.keys(sizes).length
-function overflowTitle(title: string) {
-  return title.split('').reduce((total, char: any) => total + (sizes[char] ?? averageSize), 0) > 550
-}
-
 const cli = new Command()
 
 cli
-  .command('check')
   .argument('<url>', 'Check a website')
   .option<number>('-m, --max <max>', 'Max concurrent requests', (max: string) => Number.parseInt(max), 15)
   .option('-s, --seo', 'Check SEO errors', true)
@@ -316,7 +188,5 @@ cli
 
     fs.writeFileSync('pages.json', JSON.stringify({ ...pages, global: { errors: uniqueErrors, warnings: uniqueWarnings } }, null, 2))
   })
-
-// cli.help()
 
 cli.parse()
