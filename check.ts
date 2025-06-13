@@ -11,6 +11,7 @@ export interface PageType {
   errors: string[]
   warnings: string[]
   loadingTime?: number
+  performanceScore?: 'excellent' | 'good' | 'needs-improvement' | 'poor'
 }
 
 const methods: Record<string, (options: CheckOptions, document: Document, page: PageType) => Promise<void>> = {}
