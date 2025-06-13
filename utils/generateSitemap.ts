@@ -86,7 +86,7 @@ function getPriority(depth: number) {
 }
 
 export async function generateSitemap(baseUrl?: string, options?: { max: number, output?: string, log?: boolean }) {
-  baseUrl = baseUrl ?? 'https://localhost:3000'
+  baseUrl ??= 'https://localhost:3000'
 
   if (!baseUrl.startsWith('http'))
     baseUrl = `https://${baseUrl}`

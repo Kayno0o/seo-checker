@@ -1,7 +1,7 @@
 import fs from 'node:fs'
-import { JSDOM } from 'jsdom'
-import chalk from 'chalk'
+import { colors } from '@kaynooo/utils'
 import { Command } from 'commander'
+import { JSDOM } from 'jsdom'
 
 interface PageType {
   path: string
@@ -15,10 +15,14 @@ interface PageType {
 async function testUrl(path: string) {
   try {
     const url = new URL(path)
-    await fetch(url).catch(() => {
+    try {
+      await fetch(url)
+    }
+    catch (e) {
+      console.error(e)
       console.error('URL not reachable', url.toString())
       process.exit(1)
-    })
+    }
   }
   catch (e: any) {
     console.error(e)
@@ -66,7 +70,7 @@ async function checkPath(baseUrl: string, path: string, pages: Record<string, Pa
   if (pages[path] || path.startsWith('http') || path.endsWith('sitemap.xml') || path.endsWith('robots.txt'))
     return []
 
-  console.log(chalk.cyan('[checking]'), path)
+  console.log(colors.cyan('[checking]'), path)
 
   const { seo = true, accessibility = true, socialMedia = true } = options ?? {}
 
@@ -104,7 +108,8 @@ async function checkPath(baseUrl: string, path: string, pages: Record<string, Pa
     return []
   }
 
-  const dom = new JSDOM(text)
+  const textWithoutStyles = text.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+  const dom = new JSDOM(textWithoutStyles)
   const document = dom.window.document
 
   const headings: Record<string, string[]> = {}
@@ -159,7 +164,8 @@ async function checkPath(baseUrl: string, path: string, pages: Record<string, Pa
           errors.push(`SEO: Not an image: ${imgUrl.toString()}`)
       }
       catch (e) {
-        errors.push(`SEO: Image not reachable: ${image}`)
+        errors.push(`SEO: Image not reachable: ${image} - ${(e instanceof Error ? e.message : String(e))}`)
+        console.error(`Error fetching image ${image}:`, e)
       }
     }
   }
@@ -249,36 +255,6 @@ async function checkAllPages(baseUrl: string, options: { max: number, seo: boole
   return pages
 }
 
-/*
-<script setup lang="ts">
-const letters = ref<HTMLSpanElement[]>([])
-
-const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789- '.split('')
-
-onMounted(() => {
-  // log all the letters html width precisely
-  console.log(JSON.stringify(letters.value.reduce((acc, letter) => {
-    acc[letter.textContent] = letter.getBoundingClientRect().width
-    return acc
-  }, {} as Record<string, number>)))
-})
-</script>
-
-<template>
-  <div>
-    <span
-      v-for="(letter, i) in alphabet"
-      ref="letters"
-      :key="i"
-      class="text-xl font-normal text-red"
-    >
-      <span v-if="letter === ' '">&nbsp;</span>
-      <span v-else>{{ letter }}</span>
-    </span>
-  </div>
-</template>
-*/
-
 const sizes: Record<string, number> = { '0': 11.484375, '1': 11.484375, '2': 11.484375, '3': 11.484375, '4': 11.484375, '5': 11.484375, '6': 11.484375, '7': 11.484375, '8': 11.484375, '9': 11.484375, 'A': 13.46875, 'B': 12.765625, 'C': 13.09375, 'D': 13, 'E': 11.25, 'F': 10.96875, 'G': 13.625, 'H': 14.140625, 'I': 5.84375, 'J': 11.171875, 'K': 12.703125, 'L': 10.84375, 'M': 17.53125, 'N': 14.125, 'O': 13.8125, 'P': 12.90625, 'Q': 13.8125, 'R': 12.765625, 'S': 12.296875, 'T': 12.375, 'U': 13.171875, 'V': 13.078125, 'W': 17.5, 'X': 12.71875, 'Y': 12.375, 'Z': 12.125, 'a': 10.734375, 'b': 11.265625, 'c': 10.4375, 'd': 11.28125, 'e': 10.8125, 'f': 6.9375, 'g': 11.421875, 'h': 11.203125, 'i': 5.3125, 'j': 5.203125, 'k': 10.6875, 'l': 5.3125, 'm': 17.328125, 'n': 11.203125, 'o': 11.3125, 'p': 11.265625, 'q': 11.3125, 'r': 7.296875, 's': 10.296875, 't': 6.765625, 'u': 11.203125, 'v': 10.109375, 'w': 14.703125, 'x': 10.1875, 'y': 10.046875, 'z': 10.1875, '-': 7.765625, ' ': 4.984375 }
 const averageSize = Object.values(sizes).reduce((total, size) => total + size, 0) / Object.keys(sizes).length
 function overflowTitle(title: string) {
@@ -301,8 +277,8 @@ cli
     if (!baseUrl.startsWith('http'))
       baseUrl = `https://${baseUrl}`
 
-    console.log(chalk.bold.blue('Parsing'), baseUrl)
-    console.log(chalk.bold.blue('With options'))
+    console.log(colors.bold.blue('Parsing'), baseUrl)
+    console.log(colors.bold.blue('With options'))
     console.log(Object.entries(options)
       .filter(([key, value]) => value !== undefined && key.length !== 1)
       .map(([key, value]) => `  - ${key}: ${value}`).join('\n'))
@@ -318,25 +294,25 @@ cli
 
     if (!await checkAvailable(new URL('robots.txt', baseUrl))) {
       console.log()
-      console.log(chalk.bold.red('robots.txt not found'))
+      console.log(colors.bold.red('robots.txt not found'))
     }
 
     if (!await checkAvailable(new URL('sitemap.xml', baseUrl))) {
       console.log()
-      console.log(chalk.bold.red('sitemap.xml not found'))
+      console.log(colors.bold.red('sitemap.xml not found'))
     }
 
     console.log()
-    console.log(chalk.bold.blue('Global errors'))
+    console.log(colors.bold.blue('Global errors'))
     for (const issue of uniqueErrors)
       console.log('  -', issue)
 
     console.log()
-    console.log(chalk.bold.blue('Fetched'), Object.keys(pages).length, 'pages', chalk.bold.blue('in'), Math.round(performance.now() - startTime), 'ms')
+    console.log(colors.bold.blue('Fetched'), Object.keys(pages).length, 'pages', colors.bold.blue('in'), Math.round(performance.now() - startTime), 'ms')
 
     console.log()
-    console.log(chalk.bold.red('Total errors'), Object.values(pages).reduce((total, page) => total + page.errors.length, 0))
-    console.log(chalk.bold.yellow('Total warnings'), Object.values(pages).reduce((total, page) => total + page.warnings.length, 0))
+    console.log(colors.bold.red('Total errors'), Object.values(pages).reduce((total, page) => total + page.errors.length, 0))
+    console.log(colors.bold.yellow('Total warnings'), Object.values(pages).reduce((total, page) => total + page.warnings.length, 0))
 
     fs.writeFileSync('pages.json', JSON.stringify({ ...pages, global: { errors: uniqueErrors, warnings: uniqueWarnings } }, null, 2))
   })

@@ -1,11 +1,12 @@
 {
   "name": "seo-checker",
   "type": "module",
+  "private": true,
   "module": "index.ts",
   "scripts": {
     "build": "tsup",
     "tsc": "tsc index.ts",
-    "lint:fix": "eslint . --fix",
+    "lint:fix": "bunx --bun eslint --fix",
     "lint:inspect": "eslint --inspect-config"
   },
   "peerDependencies": {
@@ -13,13 +14,15 @@
   },
   "dependencies": {
     "@antfu/eslint-config": "^2.21.1",
+    "@kaynooo/utils": "^1.2.15",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
-    "eslint": "^9.4.0",
+    "eslint": "^9.28.0",
     "jsdom": "^24.1.0",
     "tsup": "^8.1.0"
   },
   "devDependencies": {
+    "@kaynooo/eslint": "^1.1.6",
     "@types/bun": "^1.1.3",
     "@types/jsdom": "^21.1.7"
   }
